@@ -48,7 +48,9 @@ class FileExplorer:
             file_display = file[:width-1]
             
             color_pair = curses.color_pair(4)  # Default to regular file color
-            if os.path.isdir(file_path):
+            if file == "..":
+                color_pair = curses.color_pair(2)  # Use directory color for ".."
+            elif os.path.isdir(file_path):
                 color_pair = curses.color_pair(2)
             elif os.access(file_path, os.X_OK):
                 color_pair = curses.color_pair(3)
@@ -66,15 +68,15 @@ class FileExplorer:
         self.stdscr.refresh()
 
     def get_sorted_files(self):
-        files = os.listdir(self.current_path)
+        files = [".."] + os.listdir(self.current_path)
         if self.sort_key == "name":
-            return sorted(files, key=lambda x: x.lower(), reverse=self.reverse_sort)
+            return [".."] + sorted(files[1:], key=lambda x: x.lower(), reverse=self.reverse_sort)
         elif self.sort_key == "size":
-            return sorted(files, key=lambda x: os.path.getsize(os.path.join(self.current_path, x)), reverse=self.reverse_sort)
+            return [".."] + sorted(files[1:], key=lambda x: os.path.getsize(os.path.join(self.current_path, x)), reverse=self.reverse_sort)
         elif self.sort_key == "date":
-            return sorted(files, key=lambda x: os.path.getmtime(os.path.join(self.current_path, x)), reverse=self.reverse_sort)
+            return [".."] + sorted(files[1:], key=lambda x: os.path.getmtime(os.path.join(self.current_path, x)), reverse=self.reverse_sort)
         elif self.sort_key == "type":
-            return sorted(files, key=lambda x: os.path.splitext(x)[1], reverse=self.reverse_sort)
+            return [".."] + sorted(files[1:], key=lambda x: os.path.splitext(x)[1], reverse=self.reverse_sort)
 
     def run(self):
         while True:
@@ -89,10 +91,11 @@ class FileExplorer:
                 elif key == curses.KEY_DOWN:
                     self.cursor = min(len(self.files) - 1, self.cursor + 1)
                 elif key == ord(' '):
-                    if self.cursor in self.selected:
-                        self.selected.remove(self.cursor)
-                    else:
-                        self.selected.add(self.cursor)
+                    if self.cursor != 0:  # Prevent selecting ".."
+                        if self.cursor in self.selected:
+                            self.selected.remove(self.cursor)
+                        else:
+                            self.selected.add(self.cursor)
                 elif key == 10:  # Enter key
                     self.open_item()
                 elif key == ord('b'):
@@ -133,18 +136,21 @@ class FileExplorer:
 
     def open_item(self):
         item = self.files[self.cursor]
-        item_path = os.path.join(self.current_path, item)
-        if os.path.isdir(item_path):
-            self.current_path = item_path
-            self.cursor = 0
-            self.offset = 0
-            self.selected.clear()
+        if item == "..":
+            self.go_back()
         else:
-            # Open file with default application
-            curses.def_prog_mode()
-            os.system(f'xdg-open "{item_path}"')
-            curses.reset_prog_mode()
-            self.stdscr.refresh()
+            item_path = os.path.join(self.current_path, item)
+            if os.path.isdir(item_path):
+                self.current_path = item_path
+                self.cursor = 0
+                self.offset = 0
+                self.selected.clear()
+            else:
+                # Open file with default application
+                curses.def_prog_mode()
+                os.system(f'xdg-open "{item_path}"')
+                curses.reset_prog_mode()
+                self.stdscr.refresh()
 
     def go_back(self):
         self.current_path = os.path.dirname(self.current_path)
@@ -168,6 +174,8 @@ class FileExplorer:
 
     def delete_item(self):
         item = self.files[self.cursor]
+        if item == "..":
+            return
         item_path = os.path.join(self.current_path, item)
         try:
             if os.path.isdir(item_path):
@@ -179,6 +187,8 @@ class FileExplorer:
 
     def rename_item(self):
         old_name = self.files[self.cursor]
+        if old_name == "..":
+            return
         curses.echo()
         self.stdscr.addstr(0, 0, f"Enter new name for {old_name}: ", curses.color_pair(1))
         new_name = self.stdscr.getstr().decode('utf-8')
@@ -192,6 +202,8 @@ class FileExplorer:
 
     def copy_item(self):
         item = self.files[self.cursor]
+        if item == "..":
+            return
         source_path = os.path.join(self.current_path, item)
         curses.echo()
         self.stdscr.addstr(0, 0, "Enter destination path: ", curses.color_pair(1))
@@ -207,6 +219,8 @@ class FileExplorer:
 
     def move_item(self):
         item = self.files[self.cursor]
+        if item == "..":
+            return
         source_path = os.path.join(self.current_path, item)
         curses.echo()
         self.stdscr.addstr(0, 0, "Enter destination path: ", curses.color_pair(1))
@@ -218,7 +232,7 @@ class FileExplorer:
             pass  # Handle error
 
     def bulk_operations(self):
-        items = [self.files[i] for i in self.selected]
+        items = [self.files[i] for i in self.selected if self.files[i] != ".."]
         if not items:
             return
 
@@ -268,6 +282,8 @@ class FileExplorer:
 
     def show_permissions(self):
         item = self.files[self.cursor]
+        if item == "..":
+            return
         item_path = os.path.join(self.current_path, item)
         perms = os.stat(item_path).st_mode
         perm_string = f"Owner: {'r' if perms & 0o400 else '-'}{'w' if perms & 0o200 else '-'}{'x' if perms & 0o100 else '-'}\n"
@@ -285,7 +301,9 @@ class FileExplorer:
                 pass  # Handle error
 
     def compress_items(self):
-        items = [self.files[i] for i in self.selected] if self.selected else [self.files[self.cursor]]
+        items = [self.files[i] for i in self.selected if self.files[i] != ".."] if self.selected else [self.files[self.cursor]]
+        if ".." in items:
+            items.remove("..")
         
         self.stdscr.addstr(0, 0, "Choose format (zip/tar): ", curses.color_pair(1))
         curses.echo()
@@ -320,7 +338,7 @@ class FileExplorer:
         filter_pattern = self.stdscr.getstr().decode('utf-8')
         curses.noecho()
         if filter_pattern:
-            self.files = [item for item in os.listdir(self.current_path) 
+            self.files = [".."] + [item for item in os.listdir(self.current_path) 
                           if os.path.isdir(os.path.join(self.current_path, item)) or 
                           any(item.endswith(ext) for ext in filter_pattern.split(','))]
             self.cursor = 0
@@ -328,6 +346,8 @@ class FileExplorer:
 
     def edit_text_file(self):
         item = self.files[self.cursor]
+        if item == "..":
+            return
         item_path = os.path.join(self.current_path, item)
         if os.path.isfile(item_path):
             curses.def_prog_mode()
