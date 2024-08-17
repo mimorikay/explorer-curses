@@ -1,5 +1,5 @@
-**# explorer-curses
-Curses based file manager 
+explorer-curses
+A Curses based file manager 
 
 A powerful, terminal-based file explorer written in Python. Navigate and manage your file system efficiently with an intuitive, keyboard-driven interface.
 
