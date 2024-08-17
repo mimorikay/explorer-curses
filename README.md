@@ -3,6 +3,9 @@ A Curses based file manager
 
 A powerful, terminal-based file explorer written in Python. Navigate and manage your file system efficiently with an intuitive, keyboard-driven interface.
 
+![1723890240_grim](https://github.com/user-attachments/assets/b667c693-199f-4adc-8f75-c5e5e3f0e61b)
+
+
 * Features
 
 - Intuitive navigation with arrow keys and shortcuts
